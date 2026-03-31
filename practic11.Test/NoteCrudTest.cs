@@ -5,30 +5,24 @@ using practic11;
 namespace practic11.Test;
 
 
+
 public class NoteCrudTests
 {
-    private readonly DataContext _db;
+    private DataContext _db;
 
     public NoteCrudTests()
     {
-        _db = new DataContext();
-        _db.Database.EnsureCreated();
+        ResetDatabase();
     }
 
-    private async Task ClearDatabase()
+    private void ResetDatabase()
     {
+        _db?.Dispose();
+        _db = new DataContext();
+        _db.Database.EnsureCreated();
 
-        var entitys = _db.Model.GetEntityTypes();
-
-        foreach (var entity in entitys)
-        {
-            var tableName = entity.GetTableName();
-            if (tableName != null)
-            {
-                await _db.Database.ExecuteSqlRawAsync($"DELETE FROM \"{tableName}\"");
-            }
-        }
-
+        _db.Database.ExecuteSqlRaw("DELETE FROM Notes");
+        _db.ChangeTracker.Clear();
     }
 
     //  Create
@@ -36,7 +30,7 @@ public class NoteCrudTests
     [Fact]
     public async Task Create_SaveCorrectNoteToDataBase()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         string text = "Тест";
 
@@ -57,7 +51,7 @@ public class NoteCrudTests
     [Fact]
     public async Task ReadByText_ReturnCorectNotes()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         await NoteCrud.Create("хлеб черный");
         await NoteCrud.Create("хлеб белый");
@@ -73,7 +67,7 @@ public class NoteCrudTests
     [Fact]
     public async Task ReadByText_EmptyString_ReturnAllNotes()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         await NoteCrud.Create("хлеб черный");
         await NoteCrud.Create("хлеб белый");
@@ -87,7 +81,7 @@ public class NoteCrudTests
     [Fact]
     public async Task ReadByText_MissingString_ReturnEmptyList()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         await NoteCrud.Create("хлеб черный");
         await NoteCrud.Create("хлеб белый");
@@ -103,7 +97,7 @@ public class NoteCrudTests
     [Fact]
     public async Task ReadById_CorrectId_ReturnCorrectNote()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         var note = await NoteCrud.Create("хлеб черный");
         await NoteCrud.Create("хлеб белый");
@@ -118,7 +112,7 @@ public class NoteCrudTests
     [Fact]
     public async Task ReadById_MissingId_ReturnNull()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         await NoteCrud.Create("хлеб черный");
         await NoteCrud.Create("хлеб белый");
@@ -134,7 +128,7 @@ public class NoteCrudTests
     [Fact]
     public async Task Update_CorrectUpdateNote()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         var note = await NoteCrud.Create("яйца");
         var origId = note.Id;
@@ -154,7 +148,7 @@ public class NoteCrudTests
     [Fact]
     public async Task Delete_DeleteNoteFromDataBase()
     {
-        await ClearDatabase();
+        ResetDatabase();
 
         var note = await NoteCrud.Create("хлеб");
         var id = note.Id;
