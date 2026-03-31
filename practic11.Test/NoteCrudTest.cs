@@ -1,156 +1,165 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 using practic11;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.Extensions.DependencyModel;
 
-namespace practic11.Test
+namespace practic11.Test;
+
+
+public class NoteCrudTests
 {
-    public class NoteCrudTests
+    private readonly DataContext _db;
+
+    public NoteCrudTests()
     {
-        private readonly DataContext _db;
-        private readonly string _testDbPath = "test.db";
+        _db = new DataContext();
+        _db.Database.EnsureCreated();
+    }
 
-        public NoteCrudTests()
+    private async Task ClearDatabase()
+    {
+
+        var entitys = _db.Model.GetEntityTypes();
+
+        foreach (var entity in entitys)
         {
-            var options = new DbContextOptionsBuilder<DataContext>()
-                .UseSqlite($"Data Source={_testDbPath}")
-                .Options;
-
-            _db = new DataContext(options);
-
-            _db.Database.EnsureDeleted();
-            _db.Database.EnsureCreated();
-        }
-
-        public void Dispose()
-        {
-            _db.Dispose();
-            if (File.Exists(_testDbPath))
+            var tableName = entity.GetTableName();
+            if (tableName != null)
             {
-                File.Delete(_testDbPath);
+                await _db.Database.ExecuteSqlRawAsync($"DELETE FROM \"{tableName}\"");
             }
         }
 
-        //  Create
+    }
 
-        [Fact]
-        public async Task Create_SaveCorrectNoteToDataBase()
-        {
-            string text = "Тест";
+    //  Create
 
-            var note = await NoteCrud.Create(text);
-            var saved = await _db.Notes.FirstOrDefaultAsync(x => x.Id == note.Id);
+    [Fact]
+    public async Task Create_SaveCorrectNoteToDataBase()
+    {
+        await ClearDatabase();
 
+        string text = "Тест";
 
+        var note = await NoteCrud.Create(text);
+        var saved = await _db.Notes.FirstOrDefaultAsync(x => x.Id == note.Id);
 
-            Assert.NotNull(note);
-            Assert.NotEqual(0, note.Id);
-            Assert.Equal(text, note.Text);
-            Assert.True(note.Time <= DateTime.Now);
-            Assert.NotNull(saved);
-            Assert.Equal(text, saved.Text);
-            Assert.True(saved.Time <= DateTime.Now);
-        }
+        Assert.NotNull(note);
+        Assert.NotEqual(0, note.Id);
+        Assert.Equal(text, note.Text);
+        Assert.True(note.Time <= DateTime.Now);
+        Assert.NotNull(saved);
+        Assert.Equal(text, saved.Text);
+        Assert.True(saved.Time <= DateTime.Now);
+    }
 
-        //  Read by Text
+    //  Read by text
 
-        [Fact]
-        public async Task ReadByText_ReturnCorectNotes()
-        {
-            await NoteCrud.Create("хлеб черный");
-            await NoteCrud.Create("хлеб белый");
-            await NoteCrud.Create("молоко");
-            await NoteCrud.Create("яйца");
+    [Fact]
+    public async Task ReadByText_ReturnCorectNotes()
+    {
+        await ClearDatabase();
 
-            var res = await NoteCrud.Read("хлеб");
+        await NoteCrud.Create("хлеб черный");
+        await NoteCrud.Create("хлеб белый");
+        await NoteCrud.Create("молоко");
+        await NoteCrud.Create("яйца");
 
-            Assert.True(res.Count == 2);
-            Assert.All(res, x => Assert.Contains("хлеб", x.Text));
-        }
+        var res = await NoteCrud.Read("хлеб");
 
-        [Fact]
-        public async Task ReadByText_EmptyString_ReturnAllNotes()
-        {
-            await NoteCrud.Create("хлеб черный");
-            await NoteCrud.Create("хлеб белый");
-            await NoteCrud.Create("молоко");
-            await NoteCrud.Create("яйца");
+        Assert.Equal(2, res.Count);
+        Assert.All(res, x => Assert.Contains("хлеб", x.Text));
+    }
 
-            var res = await NoteCrud.Read("");
-            Assert.True(res.Count == 4);
-    
-        }
+    [Fact]
+    public async Task ReadByText_EmptyString_ReturnAllNotes()
+    {
+        await ClearDatabase();
 
-        [Fact]
-        public async Task ReadByText_MissingString_ReturnEmptyList()
-        {
-            await NoteCrud.Create("хлеб черный");
-            await NoteCrud.Create("хлеб белый");
-            await NoteCrud.Create("молоко");
-            await NoteCrud.Create("яйца");
+        await NoteCrud.Create("хлеб черный");
+        await NoteCrud.Create("хлеб белый");
+        await NoteCrud.Create("молоко");
+        await NoteCrud.Create("яйца");
 
-            var res = await NoteCrud.Read("горошек");
-            Assert.Empty(res);
-        }
+        var res = await NoteCrud.Read("");
+        Assert.Equal(4, res.Count);
+    }
 
-        //  Read by Id
+    [Fact]
+    public async Task ReadByText_MissingString_ReturnEmptyList()
+    {
+        await ClearDatabase();
 
-        [Fact]
-        public async Task ReadById_CorrectId_ReturnCorrectNote()
-        {
-            var note = await NoteCrud.Create("хлеб черный");
-            await NoteCrud.Create("хлеб белый");
-            await NoteCrud.Create("молоко");
-            await NoteCrud.Create("яйца");
+        await NoteCrud.Create("хлеб черный");
+        await NoteCrud.Create("хлеб белый");
+        await NoteCrud.Create("молоко");
+        await NoteCrud.Create("яйца");
 
-            var res = await NoteCrud.Read(note.Id);
+        var res = await NoteCrud.Read("горошек");
+        Assert.Empty(res);
+    }
 
-            Assert.Equal("хлеб черный", res.Text);
-        }
+    //  Read by id
 
-        [Fact]
-        public async Task ReadById_MissingId_ReturnNull()
-        {
-            await NoteCrud.Create("хлеб черный");
-            await NoteCrud.Create("хлеб белый");
-            await NoteCrud.Create("молоко");
-            await NoteCrud.Create("яйца");
+    [Fact]
+    public async Task ReadById_CorrectId_ReturnCorrectNote()
+    {
+        await ClearDatabase();
 
-            var res = await NoteCrud.Read(100);
+        var note = await NoteCrud.Create("хлеб черный");
+        await NoteCrud.Create("хлеб белый");
+        await NoteCrud.Create("молоко");
+        await NoteCrud.Create("яйца");
 
-            Assert.Null(res);
-        }
+        var res = await NoteCrud.Read(note.Id);
 
-        //  Update
+        Assert.Equal("хлеб черный", res.Text);
+    }
 
-        [Fact]
-        public async Task Update_CorrectUpdateNote()
-        {
-            var note = await NoteCrud.Create("яйца");
-            var origId = note.Id;
-            var origTime = note.Time;
+    [Fact]
+    public async Task ReadById_MissingId_ReturnNull()
+    {
+        await ClearDatabase();
 
-            await NoteCrud.Update(note, "хлеб");
-            var res = await NoteCrud.Read(origId);
+        await NoteCrud.Create("хлеб черный");
+        await NoteCrud.Create("хлеб белый");
+        await NoteCrud.Create("молоко");
+        await NoteCrud.Create("яйца");
 
-            Assert.Equal("хлеб", res.Text);
-            Assert.Equal(origId, note.Id);
-            Assert.Equal(origTime, note.Time);
+        var res = await NoteCrud.Read(100);
+        Assert.Null(res);
+    }
 
-        }
+    //  Update 
 
-        //  Delete
+    [Fact]
+    public async Task Update_CorrectUpdateNote()
+    {
+        await ClearDatabase();
 
-        [Fact]
-        public async Task Delete_DeleteNoteFromDataBase()
-        {
-            var note = await NoteCrud.Create("хлеб");
-            var id = note.Id;
-            await NoteCrud.Delete(note);
-            var deleted = await NoteCrud.Read(id);
-            Assert.Null(deleted);
-        }
+        var note = await NoteCrud.Create("яйца");
+        var origId = note.Id;
+        var origTime = note.Time;
 
+        await NoteCrud.Update(note, "хлеб");
+        var res = await NoteCrud.Read(origId);
+
+        Assert.NotNull(res);
+        Assert.Equal("хлеб", res.Text);
+        Assert.Equal(origId, res.Id);
+        Assert.Equal(origTime, res.Time);
+    }
+
+    //  Delete
+
+    [Fact]
+    public async Task Delete_DeleteNoteFromDataBase()
+    {
+        await ClearDatabase();
+
+        var note = await NoteCrud.Create("хлеб");
+        var id = note.Id;
+        await NoteCrud.Delete(note);
+        var deleted = await NoteCrud.Read(id);
+        Assert.Null(deleted);
     }
 }
